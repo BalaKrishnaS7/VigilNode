@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VigilNode Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111418;
+    --surface2: #161b22;
+    --border: #1e2530;
+    --accent: #00d4aa;
+    --accent-dim: #00d4aa18;
+    --yellow: #f0c040;
+    --danger: #ff4455;
+    --blue: #4488ff;
+    --text: #c8d6e5;
+    --text-dim: #5a6a7a;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+
+  /* Grid bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.25;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .layout { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-left { display: flex; align-items: center; gap: 14px; }
+
+  .shield {
+    width: 42px; height: 42px;
+    border: 1.5px solid var(--accent);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 16px var(--accent-dim);
+  }
+
+  .shield svg { width: 22px; height: 22px; }
+
+  .brand h1 {
+    font-family: var(--mono);
+    font-size: 18px;
+    color: var(--accent);
+    letter-spacing: 3px;
+  }
+  .brand p { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+
+  .status-dot {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+  }
+
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .logout-btn {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--text-dim); text-decoration: none;
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 14px; transition: all 0.2s; letter-spacing: 1px;
+  }
+  .logout-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+  /* Stat cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  @media (max-width: 768px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .stat-card.warn { border-color: var(--yellow); }
+  .stat-card.danger { border-color: var(--danger); }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.6s ease;
+  }
+
+  .stat-card.loaded::before { transform: scaleX(1); }
+
+  .stat-label {
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 2px; color: var(--text-dim);
+    text-transform: uppercase; margin-bottom: 12px;
+  }
+
+  .stat-value {
+    font-family: var(--mono); font-size: 32px;
+    color: var(--text); font-weight: 400;
+    line-height: 1;
+  }
+
+  .stat-value span { font-size: 16px; color: var(--text-dim); }
+
+  .stat-bar-wrap {
+    margin-top: 14px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .stat-bar {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: width 0.8s ease;
+  }
+
+  .stat-card.warn .stat-bar { background: var(--yellow); }
+  .stat-card.danger .stat-bar { background: var(--danger); }
+
+  /* Main grid */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .panel-title {
+    font-family: var(--mono); font-size: 12px;
+    letter-spacing: 2px; color: var(--accent); text-transform: uppercase;
+  }
+
+  .panel-count {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-dim); background: var(--border);
+    padding: 3px 10px; border-radius: 20px;
+  }
+
+  .panel-body { padding: 16px 20px; max-height: 360px; overflow-y: auto; }
+  .panel-body::-webkit-scrollbar { width: 4px; }
+  .panel-body::-webkit-scrollbar-track { background: transparent; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Alert rows */
+  .alert-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    animation: fadeIn 0.3s ease;
+  }
+
+  .alert-row:last-child { border-bottom: none; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+
+  .alert-badge {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+    padding: 3px 8px; border-radius: 4px; white-space: nowrap; margin-top: 2px;
+    font-weight: 700;
+  }
+
+  .badge-HIGH { background: #ff445522; color: var(--danger); border: 1px solid #ff445540; }
+  .badge-MED  { background: #f0c04022; color: var(--yellow);  border: 1px solid #f0c04040; }
+  .badge-LOW  { background: #4488ff22; color: var(--blue);    border: 1px solid #4488ff40; }
+
+  .alert-content { flex: 1; min-width: 0; }
+  .alert-msg { font-size: 14px; color: var(--text); font-weight: 600; }
+  .alert-detail { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .alert-time { font-family: var(--mono); font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+
+  .no-alerts { font-family: var(--mono); font-size: 13px; color: var(--text-dim); text-align: center; padding: 40px 0; }
+
+  /* Process list */
+  .proc-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border); font-family: var(--mono);
+  }
+  .proc-row:last-child { border-bottom: none; }
+  .proc-name { font-size: 13px; color: var(--text); }
+  .proc-cpu { font-size: 12px; color: var(--text-dim); }
+  .proc-cpu.high { color: var(--yellow); }
+  .proc-cpu.very-high { color: var(--danger); }
+
+  /* Ports */
+  .port-list { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 20px; }
+  .port-tag {
+    font-family: var(--mono); font-size: 12px;
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 4px 12px; border-radius: 4px; color: var(--accent);
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <header>
+    <div class="header-left">
+      <div class="shield">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#00d4aa" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+      <div class="brand">
+        <h1>VIGILNODE</h1>
+        <p>SECURITY MONITOR</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-dot">
+        <div class="dot"></div>
+        <span id="status-text">CONNECTING...</span>
+      </div>
+      <a href="/logout" class="logout-btn">LOGOUT</a>
+    </div>
+  </header>
+
+  <!-- Stat Cards -->
+  <div class="stats-grid">
+    <div class="stat-card" id="card-cpu">
+      <div class="stat-label">CPU USAGE</div>
+      <div class="stat-value" id="val-cpu">--<span>%</span></div>
+      <div class="stat-bar-wrap"><div class="stat-bar" id="bar-cpu" style="width:0%"></div></div>
+    </div>
+    <div class="stat-card" id="card-ram">
+      <div class="stat-label">MEMORY</div>
+      <div class="stat-value" id="val-ram">--<span>%</span></div>
+      <div class="stat-bar-wrap"><div class="stat-bar" id="bar-ram" style="width:0%"></div></div>
+    </div>
+    <div class="stat-card" id="card-disk">
+      <div class="stat-label">DISK</div>
+      <div class="stat-value" id="val-disk">--<span>%</span></div>
+      <div class="stat-bar-wrap"><div class="stat-bar" id="bar-disk" style="width:0%"></div></div>
+    </div>
+    <div class="stat-card" id="card-temp">
+      <div class="stat-label">TEMPERATURE</div>
+      <div class="stat-value" id="val-temp">--<span>°C</span></div>
+      <div class="stat-bar-wrap"><div class="stat-bar" id="bar-temp" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <!-- Alerts panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">SECURITY ALERTS</span>
+        <span class="panel-count" id="alert-count">0</span>
+      </div>
+      <div class="panel-body" id="alerts-list">
+        {% if alerts %}
+          {% for a in alerts %}
+          <div class="alert-row">
+            <span class="alert-badge badge-{{ a.level }}">{{ a.level }}</span>
+            <div class="alert-content">
+              <div class="alert-msg">{{ a.message }}</div>
+              {% if a.detail %}<div class="alert-detail">{{ a.detail }}</div>{% endif %}
+            </div>
+            <div class="alert-time">{{ a.timestamp[11:19] }}</div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="no-alerts">NO ALERTS — SYSTEM CLEAN</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Open ports panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">OPEN PORTS</span>
+        <span class="panel-count" id="port-count">--</span>
+      </div>
+      <div class="port-list" id="ports-list">
+        <span style="font-family:var(--mono);font-size:13px;color:var(--text-dim)">Loading...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const socket = io();
+
+  socket.on("connect", () => {
+    document.getElementById("status-text").textContent = "LIVE";
+  });
+
+  socket.on("disconnect", () => {
+    document.getElementById("status-text").textContent = "DISCONNECTED";
+  });
+
+  // Receive stats from server every 2 seconds
+  socket.on("system_stats", (data) => {
+    updateStat("cpu",  data.cpu,  data.cpu >= 85 ? "danger" : data.cpu >= 70 ? "warn" : "");
+    updateStat("ram",  data.ram,  data.ram >= 90 ? "danger" : data.ram >= 75 ? "warn" : "");
+    updateStat("disk", data.disk, data.disk >= 95 ? "danger" : data.disk >= 80 ? "warn" : "");
+
+    if (data.temp) {
+      updateStat("temp", data.temp, data.temp >= 80 ? "danger" : data.temp >= 65 ? "warn" : "", "°C", 100);
+    } else {
+      document.getElementById("val-temp").innerHTML = "N/A";
+    }
+
+    if (data.network && data.network.open_ports) {
+      renderPorts(data.network.open_ports);
+    }
+  });
+
+  // New alert pushed from server
+  socket.on("new_alert", (alert) => {
+    prependAlert(alert);
+  });
+
+  function updateStat(key, value, state, unit="%", maxBar=100) {
+    const val = document.getElementById(`val-${key}`);
+    const bar = document.getElementById(`bar-${key}`);
+    const card = document.getElementById(`card-${key}`);
+
+    val.innerHTML = `${value}<span>${unit}</span>`;
+    bar.style.width = `${Math.min(value, 100)}%`;
+
+    card.classList.remove("warn", "danger", "loaded");
+    if (state) card.classList.add(state);
+    card.classList.add("loaded");
+  }
+
+  function prependAlert(a) {
+    const list = document.getElementById("alerts-list");
+    const empty = list.querySelector(".no-alerts");
+    if (empty) empty.remove();
+
+    const time = a.timestamp ? a.timestamp.substring(11, 19) : new Date().toTimeString().substring(0,8);
+    const row = document.createElement("div");
+    row.className = "alert-row";
+    row.innerHTML = `
+      <span class="alert-badge badge-${a.level}">${a.level}</span>
+      <div class="alert-content">
+        <div class="alert-msg">${a.message}</div>
+        ${a.detail ? `<div class="alert-detail">${a.detail}</div>` : ""}
+      </div>
+      <div class="alert-time">${time}</div>
+    `;
+    list.prepend(row);
+
+    // Update count
+    const count = list.querySelectorAll(".alert-row").length;
+    document.getElementById("alert-count").textContent = count;
+  }
+
+  function renderPorts(ports) {
+    const el = document.getElementById("ports-list");
+    el.innerHTML = ports.length
+      ? ports.map(p => `<span class="port-tag">${p}</span>`).join("")
+      : `<span style="font-family:var(--mono);font-size:13px;color:var(--text-dim)">No open ports detected</span>`;
+    document.getElementById("port-count").textContent = ports.length;
+  }
+
+  // Init alert count
+  document.addEventListener("DOMContentLoaded", () => {
+    const rows = document.querySelectorAll(".alert-row").length;
+    document.getElementById("alert-count").textContent = rows;
+  });
+</script>
+</body>
+</html>
