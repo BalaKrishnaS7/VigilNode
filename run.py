@@ -1,5 +1,7 @@
 import eventlet
-eventlet.monkey_patch()  # Must be first — patches stdlib for async
+# Patch for async I/O (required for SocketIO)
+# Don't patch thread module to avoid Python 3.14 compatibility issues  
+eventlet.monkey_patch(socket=True, select=True)
 
 import threading
 import time

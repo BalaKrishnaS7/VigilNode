@@ -3,7 +3,7 @@ from flask_socketio import SocketIO
 from config import Config
 from app.database import init_db
 
-socketio = SocketIO(cors_allowed_origins="*", async_mode="eventlet")
+socketio = SocketIO(cors_allowed_origins="*", async_mode="threading")
 
 
 def create_app():

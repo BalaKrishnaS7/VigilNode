@@ -6,7 +6,7 @@ VigilNode is a lightweight Python agent that runs on any spare laptop, Raspberry
 
 It watches your system health **and** flags suspicious activity: unusual processes, newly opened ports, and SSH brute-force attempts — then alerts you instantly via Telegram.
 
-![dashboard preview](docs/dashboard-preview.png)
+![dashboard preview](docs/dashboard-preview.svg)
 
 ---
 
@@ -56,8 +56,11 @@ cd vigilnode
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure
+# Configure (Linux/macOS)
 cp .env.example .env
+# Configure (Windows PowerShell)
+# Copy-Item .env.example .env
+
 # Edit .env with your password and optional Telegram credentials
 
 # Run
@@ -161,6 +164,7 @@ VigilNode runs three background threads alongside the Flask web server:
 ```
 
 The Flask dashboard receives live stats via WebSockets (Flask-SocketIO), so the browser updates without polling.
+Current runtime mode uses Flask-SocketIO `threading` async mode for Python 3.14 compatibility.
 
 ---
 
@@ -181,7 +185,7 @@ The Flask dashboard receives live stats via WebSockets (Flask-SocketIO), so the 
 | Component | Technology | Why |
 |---|---|---|
 | Backend | Python, Flask | Lightweight, low memory, runs on old hardware |
-| Real-time | Flask-SocketIO + eventlet | Push updates without polling |
+| Real-time | Flask-SocketIO (threading mode) | Push updates without polling |
 | System data | psutil | Cross-platform, all-in-one |
 | Database | SQLite | Zero setup, file-based, no separate server |
 | Alerts | Telegram Bot API | Free, reliable, works on any phone |
@@ -198,6 +202,14 @@ vigilnode/
 ├── requirements.txt
 ├── Dockerfile
 ├── .env.example
+├── docs/
+│   └── dashboard-preview.svg
+├── tests/
+│   ├── __init__.py
+│   ├── test_alerts.py
+│   ├── test_auth_log.py
+│   ├── test_config.py
+│   └── test_process.py
 └── app/
     ├── __init__.py         # Flask app factory + SocketIO init
     ├── routes.py           # Dashboard, login/logout, REST API
