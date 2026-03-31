@@ -50,7 +50,7 @@ Most people have an old device collecting dust. Cloud monitoring tools are eithe
 
 ```bash
 # Clone
-git clone https://github.com/yourusername/vigilnode.git
+git clone https://github.com/BalaKrishnaS7/VigilNode.git
 cd vigilnode
 
 # Install dependencies
